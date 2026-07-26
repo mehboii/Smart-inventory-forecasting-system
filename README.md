@@ -6,7 +6,7 @@ A full-stack university project for small-business inventory tracking and explai
 
 - Frontend: React, Vite, Tailwind CSS, Recharts
 - Backend: Node.js, Express
-- Database: SQLite through `better-sqlite3`
+- Database: Supabase Postgres through `@supabase/supabase-js`
 - Auth: JWT plus bcrypt password hashing
 - Forecasting: Simple Moving Average and Exponential Smoothing
 
@@ -29,6 +29,8 @@ npm install
 npm run seed
 npm run dev
 ```
+
+Set `SUPABASE_URL` and `SUPABASE_KEY` in `backend/.env` using the project values. The schema has already been created in the connected Supabase project; the seed command writes demo data there.
 
 The API runs at `http://localhost:4000`.
 
@@ -104,5 +106,5 @@ The first value is the sale date in `YYYY-MM-DD` format. The second value is qua
 ## Notes for Review
 
 - Forecasting logic lives in `backend/src/services/forecastService.js`, not inside the route handler.
-- SQLite data is stored locally under `backend/data/` after the app or seed script runs.
+- Data is stored in Supabase Postgres and survives closing or restarting the app.
 - The seed script creates 12 products and 90 days of sales history per product.

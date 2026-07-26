@@ -1,4 +1,4 @@
-import { db } from '../db/database.js';
+import { db, assertDb } from '../db/database.js';
 
 function addDays(date, days) {
   const copy = new Date(`${date}T00:00:00.000Z`);
@@ -37,17 +37,15 @@ function exponentialSmoothing(history, horizon, alpha) {
   return Array.from({ length: horizon }, () => Number(smoothed.toFixed(2)));
 }
 
-export function generateForecast({ productId, method = 'moving_average', horizon = 14, windowSize = 7, alpha = 0.35 }) {
-  const product = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
+export async function generateForecast({ productId, method = 'moving_average', horizon = 14, windowSize = 7, alpha = 0.35 }) {
+  const product = assertDb(await db.from('products').select('*').eq('id', productId).maybeSingle());
   if (!product) {
     const error = new Error('Product not found');
     error.status = 404;
     throw error;
   }
 
-  const history = db
-    .prepare('SELECT date, quantity_sold FROM sales_history WHERE product_id = ? ORDER BY date ASC')
-    .all(productId);
+  const history = assertDb(await db.from('sales_history').select('date, quantity_sold').eq('product_id', productId).order('date'));
 
   if (!history.length) {
     const error = new Error('At least one historical sales entry is required');
@@ -79,15 +77,8 @@ export function generateForecast({ productId, method = 'moving_average', horizon
     ? Math.max(0, Math.ceil(leadTimeDemand + product.reorder_point - product.current_stock))
     : 0;
 
-  const deletePrevious = db.prepare('DELETE FROM forecasts WHERE product_id = ? AND method = ?');
-  const insertForecast = db.prepare(
-    'INSERT INTO forecasts (product_id, forecast_date, predicted_demand, method) VALUES (?, ?, ?, ?)'
-  );
-  const save = db.transaction(() => {
-    deletePrevious.run(productId, method);
-    series.forEach((point) => insertForecast.run(productId, point.forecast_date, point.predicted_demand, method));
-  });
-  save();
+  assertDb(await db.from('forecasts').delete().eq('product_id', productId).eq('method', method));
+  assertDb(await db.from('forecasts').insert(series.map((point) => ({ product_id: productId, ...point, method }))));
 
   const explanation =
     method === 'exponential_smoothing'
