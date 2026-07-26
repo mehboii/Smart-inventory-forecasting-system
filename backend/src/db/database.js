@@ -1,18 +1,23 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
-const dbPath = process.env.DATABASE_URL || './data/inventory.db';
-const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const resolvedPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(backendRoot, dbPath);
-fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+const url = process.env.SUPABASE_URL || 'https://lmchqykidfdyanndexjp.supabase.co';
+const key = process.env.SUPABASE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
-export const db = new Database(resolvedPath);
-db.pragma('foreign_keys = ON');
+if (!key) {
+  throw new Error('SUPABASE_KEY is required. Add the Supabase publishable key to backend/.env.');
+}
 
-const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
-db.exec(schema);
+// This client is only used by the backend. Never expose SUPABASE_KEY through Vite.
+export const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+
+export function assertDb(result, message = 'Database request failed') {
+  if (result.error) {
+    const error = new Error(result.error.message || message);
+    error.code = result.error.code;
+    throw error;
+  }
+  return result.data;
+}
