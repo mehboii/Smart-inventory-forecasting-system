@@ -475,26 +475,142 @@ body::before {
 }
 
 .dark .liquid-glass-dashboard::before {
-  background: rgba(14, 165, 233, 0.16);
+  display: none;
 }
 
 .dark .liquid-glass-dashboard::after {
-  background: rgba(168, 85, 247, 0.16);
+  display: none;
 }
 
 .dark .liquid-glass-dashboard > .card {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.54));
-  border-color: rgba(148, 163, 184, 0.24);
-  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.26), inset 0 1px 0 rgba(226, 232, 240, 0.1);
+  backdrop-filter: blur(26px) saturate(145%);
+  background:
+    linear-gradient(135deg, rgba(74, 71, 83, 0.56), rgba(27, 29, 43, 0.76) 48%, rgba(15, 18, 30, 0.82));
+  border-color: rgba(231, 231, 241, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
 }
 
 .dark .liquid-glass-dashboard > .card::before {
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0.1), transparent 34%);
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.035) 29%, transparent 54%);
 }
 
 .dark .liquid-glass-dashboard .metric-card {
-  background: linear-gradient(145deg, rgba(51, 65, 85, 0.62), rgba(15, 23, 42, 0.48));
-  border-color: rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(20px) saturate(140%);
+  background: linear-gradient(145deg, rgba(79, 76, 91, 0.48), rgba(25, 27, 40, 0.68));
+  border-color: rgba(238, 238, 246, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), inset 0 -1px 0 rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.dark .liquid-glass-dashboard .metric-card:hover {
+  border-color: rgba(251, 146, 60, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 18px 34px rgba(0, 0, 0, 0.24);
+}
+
+.dark .liquid-glass-dashboard .current-risk-panel {
+  background:
+    linear-gradient(115deg, rgba(126, 57, 44, 0.18), transparent 28%),
+    linear-gradient(135deg, rgba(52, 50, 64, 0.69), rgba(19, 22, 34, 0.82));
+}
+
+.dark .liquid-glass-dashboard .risk-score-panel {
+  background:
+    linear-gradient(155deg, rgba(121, 61, 56, 0.18), transparent 42%),
+    linear-gradient(135deg, rgba(57, 55, 69, 0.69), rgba(18, 21, 33, 0.86));
+}
+
+.dark .liquid-glass-dashboard .trend-panel {
+  background:
+    linear-gradient(130deg, rgba(106, 62, 143, 0.12), transparent 42%),
+    linear-gradient(135deg, rgba(50, 48, 63, 0.7), rgba(17, 20, 32, 0.84));
+}
+
+.dark .liquid-glass-dashboard .category-panel,
+.dark .liquid-glass-dashboard .details-panel,
+.dark .liquid-glass-dashboard .dashboard-alerts {
+  background:
+    linear-gradient(135deg, rgba(57, 56, 70, 0.65), rgba(17, 20, 32, 0.84));
+}
+
+.dark .liquid-glass-dashboard .eyebrow,
+.dark .liquid-glass-dashboard .metric-card p,
+.dark .liquid-glass-dashboard .category-legend div,
+.dark .liquid-glass-dashboard .chart-labels {
+  color: #a9abb8;
+}
+
+.dark .liquid-glass-dashboard .panel-heading h3,
+.dark .liquid-glass-dashboard .metric-card strong,
+.dark .liquid-glass-dashboard .category-legend strong,
+.dark .liquid-glass-dashboard .risk-gauge-inner strong {
+  color: #f7f4f1;
+}
+
+.dark .liquid-glass-dashboard .period-control,
+.dark .liquid-glass-dashboard .risk-badge,
+.dark .liquid-glass-dashboard .panel-action {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.13);
+  color: #c9c7ce;
+}
+
+.dark .liquid-glass-dashboard .period-control {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.dark .liquid-glass-dashboard .risk-badge {
+  color: #f4b987;
+}
+
+.dark .liquid-glass-dashboard .live-status {
+  color: #6ee7c5;
+}
+
+.dark .liquid-glass-dashboard .chart-grid-line {
+  stroke: rgba(209, 204, 223, 0.16);
+}
+
+.dark .liquid-glass-dashboard .trend-line {
+  stroke: #d78cff;
+}
+
+.dark .liquid-glass-dashboard .risk-gauge {
+  --gauge-track: #d0a72e;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 30px rgba(0, 0, 0, 0.18);
+}
+
+.dark .liquid-glass-dashboard .risk-gauge::after,
+.dark .liquid-glass-dashboard .category-donut::after {
+  background: rgba(20, 23, 35, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.dark .liquid-glass-dashboard .details-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.dark .liquid-glass-dashboard .status-ready {
+  background: rgba(45, 212, 191, 0.13);
+  color: #7ce8d1;
+}
+
+.dark .liquid-glass-dashboard .status-warning {
+  background: rgba(251, 146, 60, 0.14);
+  color: #ffc18c;
+}
+
+.dark .app-shell {
+  background:
+    linear-gradient(112deg, #211115 0%, #11111a 31%, #090d17 66%, #0c111d 100%);
+}
+
+.dark .sidebar {
+  background: rgba(12, 15, 27, 0.78);
+  border-color: rgba(230, 228, 240, 0.1);
+  box-shadow: inset -1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.dark .main-content {
+  background: linear-gradient(150deg, rgba(153, 73, 48, 0.09), transparent 27%, rgba(74, 58, 132, 0.08) 100%);
 }
 
 .dashboard-heading h2 {
