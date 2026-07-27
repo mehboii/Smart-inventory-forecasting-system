@@ -8,14 +8,23 @@ import { productRouter } from './routes/productRoutes.js';
 import { salesRouter } from './routes/salesRoutes.js';
 import { forecastRouter } from './routes/forecastRoutes.js';
 import { reportRouter } from './routes/reportRoutes.js';
+import { liveRouter } from './routes/liveRoutes.js';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 4000;
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const configuredOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: clientOrigin, credentials: true }));
+function isAllowedOrigin(origin) {
+  if (!origin || configuredOrigins.includes(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
+app.use(cors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)), credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
@@ -25,6 +34,7 @@ app.use('/api/products', productRouter);
 app.use('/api/sales', salesRouter);
 app.use('/api/forecasts', forecastRouter);
 app.use('/api/reports', reportRouter);
+app.use('/api/live', liveRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

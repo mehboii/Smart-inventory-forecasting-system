@@ -12,18 +12,44 @@ export default function Forecasting() {
   const [settings, setSettings] = useState({ method: 'moving_average', horizon: 14, windowSize: 7, alpha: 0.35 });
   const [forecast, setForecast] = useState(null);
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    api('/products').then((data) => {
-      setProducts(data.products);
-      if (data.products[0]) setProductId(String(data.products[0].id));
-    });
+    let active = true;
+    async function loadProducts() {
+      try {
+        const data = await api('/products');
+        if (!active) return;
+        setProducts(data.products);
+        setProductId((current) => data.products.some((product) => String(product.id) === current) ? current : String(data.products[0]?.id || ''));
+        setLastUpdated(new Date());
+      } catch (loadError) {
+        if (active) setError(loadError.message);
+      }
+    }
+    loadProducts();
+    const interval = window.setInterval(loadProducts, 5000);
+    return () => { active = false; window.clearInterval(interval); };
   }, []);
 
   useEffect(() => {
     if (!productId) return;
-    api(`/sales/${productId}`).then((data) => setSales(data.sales));
+    let active = true;
+    async function loadSales() {
+      try {
+        const data = await api(`/sales/${productId}`);
+        if (active) {
+          setSales(data.sales);
+          setLastUpdated(new Date());
+        }
+      } catch (loadError) {
+        if (active) setError(loadError.message);
+      }
+    }
+    loadSales();
+    const interval = window.setInterval(loadSales, 5000);
     setForecast(null);
+    return () => { active = false; window.clearInterval(interval); };
   }, [productId]);
 
   const chartData = useMemo(() => {
@@ -70,7 +96,10 @@ export default function Forecasting() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">Forecasting</h2>
-        <p className="text-slate-500">Upload historical sales and forecast future demand.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-slate-500 dark:text-slate-400">Upload historical sales and forecast future demand.</p>
+          <span className="live-status"><span className="live-dot" /> Live{lastUpdated ? ` | ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+        </div>
       </div>
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <section className="card grid gap-4 lg:grid-cols-4">
