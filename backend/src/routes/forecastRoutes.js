@@ -2,6 +2,7 @@ import express from 'express';
 import { db, assertDb } from '../db/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { generateForecast } from '../services/forecastService.js';
+import { publishInventoryUpdate } from '../services/liveUpdates.js';
 
 export const forecastRouter = express.Router();
 forecastRouter.use(authenticate);
@@ -11,15 +12,15 @@ forecastRouter.post('/:productId', async (req, res) => {
   if (!product) return res.status(404).json({ message: 'Product not found' });
 
   try {
-    return res.json(
-      await generateForecast({
+    const forecast = await generateForecast({
         productId: Number(req.params.productId),
         method: req.body.method,
         horizon: req.body.horizon,
         windowSize: req.body.windowSize,
         alpha: req.body.alpha
-      })
-    );
+      });
+    publishInventoryUpdate(req.user.id, 'forecast');
+    return res.json(forecast);
   } catch (error) {
     return res.status(error.status || 500).json({ message: error.message || 'Forecast generation failed' });
   }

@@ -2,6 +2,7 @@ import express from 'express';
 import { db, assertDb } from '../db/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireFields, toPositiveFloat, toPositiveInt } from '../utils/validators.js';
+import { publishInventoryUpdate } from '../services/liveUpdates.js';
 
 export const productRouter = express.Router();
 productRouter.use(authenticate);
@@ -17,6 +18,7 @@ productRouter.post('/', async (req, res) => {
   if (error) return res.status(400).json({ message: error });
   const result = await db.from('products').insert({ user_id: req.user.id, ...normalizeProduct(req.body) }).select().single();
   if (result.error) return res.status(result.error.code === '23505' ? 409 : 500).json({ message: result.error.code === '23505' ? 'SKU already exists' : 'Product creation failed' });
+  publishInventoryUpdate(req.user.id, 'product');
   return res.status(201).json({ product: result.data });
 });
 
@@ -27,6 +29,7 @@ productRouter.put('/:id', async (req, res) => {
   if (error) return res.status(400).json({ message: error });
   const result = await db.from('products').update({ ...normalizeProduct(req.body), updated_at: new Date().toISOString() }).eq('id', req.params.id).eq('user_id', req.user.id).select().single();
   if (result.error) return res.status(result.error.code === '23505' ? 409 : 500).json({ message: result.error.code === '23505' ? 'SKU already exists' : 'Product update failed' });
+  publishInventoryUpdate(req.user.id, 'product');
   return res.json({ product: result.data });
 });
 
@@ -34,6 +37,7 @@ productRouter.delete('/:id', async (req, res) => {
   const result = await db.from('products').delete().eq('id', req.params.id).eq('user_id', req.user.id).select('id');
   if (result.error) return res.status(500).json({ message: 'Product deletion failed' });
   if (!result.data.length) return res.status(404).json({ message: 'Product not found' });
+  publishInventoryUpdate(req.user.id, 'product');
   return res.json({ message: 'Product deleted' });
 });
 
