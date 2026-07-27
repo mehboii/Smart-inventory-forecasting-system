@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { navigate } from '../App.jsx';
 import { api } from '../api/client.js';
 import { subscribeToInventoryUpdates } from '../api/live.js';
+import { formatInr } from '../utils/currency.js';
 
 const metricLabels = [
   ['Total products', 'Products'],
@@ -22,28 +23,28 @@ function MetricCard({ label, value, mark, index }) {
   );
 }
 
-function RiskGauge({ score }) {
+function RiskGauge({ score, level }) {
   const gaugeAngle = Math.max(0, Math.min(260, Math.round((score / 1000) * 260)));
   return (
     <section className="card risk-score-panel">
       <div className="panel-heading"><div><p className="eyebrow">Current state</p><h3>Risk Score</h3></div><span className="panel-menu">:</span></div>
       <div className="risk-gauge" style={{ '--gauge-angle': `${gaugeAngle}deg` }}>
-        <div className="risk-gauge-inner"><span>Score</span><strong>{score}</strong><small>{score > 700 ? 'High' : score > 400 ? 'Medium' : 'Low'}</small></div>
+        <div className="risk-gauge-inner"><span>Score</span><strong>{score}</strong><small>{level}</small></div>
       </div>
       <div className="gauge-scale"><span>0</span><span>1000</span></div>
     </section>
   );
 }
 
-function InventoryTrend({ products }) {
-  const values = products.slice(0, 12).map((product) => Number(product.current_stock) || 0);
-  const safeValues = values.length ? values : [0, 0, 0, 0, 0, 0];
-  const max = Math.max(...safeValues, 1);
-  const points = safeValues.map((value, index) => {
-    const x = safeValues.length === 1 ? 50 : (index / (safeValues.length - 1)) * 100;
-    const y = 92 - (value / max) * 62;
+function InventoryTrend({ trend }) {
+  const max = Math.max(...trend.map((point) => Number(point.quantitySold) || 0), 1);
+  const points = trend.map((point, index) => {
+    const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
+    const y = 92 - ((Number(point.quantitySold) || 0) / max) * 62;
     return `${x},${y}`;
   }).join(' ');
+
+  if (!trend.length) return <p className="chart-empty">No sales history is available yet.</p>;
 
   return (
     <div className="trend-chart">
@@ -53,22 +54,18 @@ function InventoryTrend({ products }) {
         <polygon points={`0,100 ${points} 100,100`} className="trend-area" />
         <polyline points={points} className="trend-line" />
       </svg>
-      <div className="chart-labels">{safeValues.slice(0, 6).map((_, index) => <span key={index}>{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][index]}</span>)}</div>
+      <div className="chart-labels">{trend.filter((_, index) => index % 2 === 0).map((point) => <span key={point.date}>{point.date.slice(5)}</span>)}</div>
     </div>
   );
 }
 
-function CategoryMix({ products }) {
-  const categories = useMemo(() => Object.entries(products.reduce((result, product) => {
-    result[product.category] = (result[product.category] || 0) + 1;
-    return result;
-  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 4), [products]);
-  const total = categories.reduce((sum, [, count]) => sum + count, 0) || 1;
+function CategoryMix({ categories, totalProducts }) {
+  const visibleCategories = categories.slice(0, 4);
   const colors = ['#a855f7', '#2f80ed', '#18b7d8', '#ef4e9b'];
   let offset = 0;
-  const stops = categories.map(([, count], index) => {
+  const stops = visibleCategories.map((category, index) => {
     const start = offset;
-    offset += (count / total) * 100;
+    offset += category.percentage;
     return `${colors[index]} ${start}% ${offset}%`;
   });
 
@@ -76,35 +73,34 @@ function CategoryMix({ products }) {
     <section className="card category-panel">
       <div className="panel-heading"><div><p className="eyebrow">Product mix</p><h3>By category</h3></div><span className="panel-menu">:</span></div>
       <div className="category-content">
-        <div className="category-donut" style={{ background: `conic-gradient(${stops.length ? stops.join(', ') : '#334155 0 100%'})` }}><div><strong>{products.length}</strong><span>Total</span></div></div>
-        <div className="category-legend">{categories.map(([name, count], index) => <div key={name}><span className="legend-dot" style={{ background: colors[index] }} /> <span>{name}</span><strong>{Math.round((count / total) * 100)}%</strong></div>)}</div>
+        <div className="category-donut" style={{ background: `conic-gradient(${stops.length ? stops.join(', ') : '#334155 0 100%'})` }}><div><strong>{totalProducts}</strong><span>Total</span></div></div>
+        <div className="category-legend">{visibleCategories.map((category, index) => <div key={category.category}><span className="legend-dot" style={{ background: colors[index] }} /> <span>{category.category}</span><strong>{category.percentage}%</strong></div>)}</div>
       </div>
     </section>
   );
 }
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [syncError, setSyncError] = useState('');
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [summary, productData, alertData] = await Promise.all([api('/products/summary/metrics'), api('/products'), api('/forecasts/alerts/summary')]);
-      setMetrics(summary);
-      setProducts(productData.products);
-      setAlerts(alertData.alerts);
-      setLastUpdated(new Date());
-    } catch {
+      const snapshot = await api(`/dashboard?refresh=${Date.now()}`);
+      setDashboard(snapshot);
+      setLastUpdated(new Date(snapshot.updatedAt));
+      setSyncError('');
+    } catch (error) {
       setLastUpdated(null);
+      setSyncError(error.message || 'Dashboard data is unavailable.');
     }
   }, []);
 
   useEffect(() => {
     loadDashboard();
-    const interval = window.setInterval(loadDashboard, 15000);
+    const interval = window.setInterval(loadDashboard, 2000);
     return () => window.clearInterval(interval);
   }, [loadDashboard]);
 
@@ -113,35 +109,40 @@ export default function Dashboard() {
     onStatusChange: setLiveConnected
   }), [loadDashboard]);
 
-  const riskScore = metrics?.totalProducts ? Math.max(0, Math.min(1000, 920 - ((metrics.lowStockItems * 2 + metrics.dueForReorder) / metrics.totalProducts) * 420)) : 0;
+  const metrics = dashboard?.metrics;
+  const products = dashboard?.products || [];
+  const alerts = dashboard?.alerts || [];
+  const salesTrend = dashboard?.salesTrend || [];
+  const categoryMix = dashboard?.categoryMix || [];
   const cardValues = [
     metrics?.totalProducts ?? 0,
     metrics?.lowStockItems ?? 0,
     metrics?.dueForReorder ?? 0,
-    `$${metrics?.inventoryValue ?? 0}`,
-    alerts.length
+    formatInr(metrics?.inventoryValue),
+    metrics?.openAlerts ?? 0
   ];
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page liquid-glass-dashboard">
       <div className="page-heading dashboard-heading">
         <div><p className="eyebrow">Workspace / Overview</p><h2>Current Risk</h2></div>
         <div className="heading-controls"><span className="period-control">Daily <span>v</span></span><span className={`live-status ${liveConnected ? '' : 'live-status-pending'}`}><span className="live-dot" /> {liveConnected ? 'Live' : 'Connecting'}{lastUpdated ? ` | ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div>
       </div>
+      {syncError && <p className="dashboard-sync-error">{syncError}</p>}
 
       <div className="risk-layout">
         <section className="card current-risk-panel">
           <div className="metric-grid">{metricLabels.map(([label, mark], index) => <MetricCard key={label} label={label} value={cardValues[index]} mark={mark.slice(0, 1)} index={index} />)}</div>
         </section>
-        <RiskGauge score={Math.round(riskScore)} />
+        <RiskGauge score={dashboard?.risk?.score ?? 0} level={dashboard?.risk?.level ?? 'Low'} />
       </div>
 
       <div className="analysis-layout">
         <section className="card trend-panel">
-          <div className="panel-heading"><div><p className="eyebrow">Live inventory signal</p><h3>Inventory Trend</h3></div><span className="period-control">Monthly <span>v</span></span></div>
-          <InventoryTrend products={products} />
+          <div className="panel-heading"><div><p className="eyebrow">Live sales history</p><h3>Sales Trend</h3></div><span className="period-control">Last 14 days</span></div>
+          <InventoryTrend trend={salesTrend} />
         </section>
-        <CategoryMix products={products} />
+        <CategoryMix categories={categoryMix} totalProducts={metrics?.totalProducts ?? 0} />
       </div>
 
       <section className="card details-panel">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import ProductForm from '../components/ProductForm.jsx';
+import { formatInr } from '../utils/currency.js';
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
@@ -72,7 +73,7 @@ export default function Inventory() {
                 <td>{product.category}</td>
                 <td>{product.current_stock}</td>
                 <td>{product.reorder_point}</td>
-                <td>${product.unit_cost}</td>
+                <td>{formatInr(product.unit_cost)}</td>
                 <td>{product.lead_time_days} days</td>
                 <td className="space-x-2">
                   <button className="text-blue-700" onClick={() => setEditing(product)}>Edit</button>
