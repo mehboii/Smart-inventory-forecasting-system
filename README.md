@@ -54,6 +54,11 @@ npm run dev
 
 The app runs at `http://localhost:5173`.
 
+During local development, frontend requests use `/api` and Vite proxies them
+to `http://127.0.0.1:4000`. This keeps the React UI wired to Express without
+hard-coding a browser-visible backend origin. Only set `VITE_API_URL` when the
+frontend and API are deployed on different hosts.
+
 ## Main Features
 
 - Register and login with JWT authentication.

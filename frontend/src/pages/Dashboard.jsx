@@ -60,13 +60,12 @@ function InventoryTrend({ trend }) {
 }
 
 function CategoryMix({ categories, totalProducts }) {
-  const visibleCategories = categories.slice(0, 4);
-  const colors = ['#a855f7', '#2f80ed', '#18b7d8', '#ef4e9b'];
+  const categoryColor = (index) => `hsl(${(index * 137.508) % 360} 70% 55%)`;
   let offset = 0;
-  const stops = visibleCategories.map((category, index) => {
+  const stops = categories.map((category, index) => {
     const start = offset;
     offset += category.percentage;
-    return `${colors[index]} ${start}% ${offset}%`;
+    return `${categoryColor(index)} ${start}% ${offset}%`;
   });
 
   return (
@@ -74,7 +73,7 @@ function CategoryMix({ categories, totalProducts }) {
       <div className="panel-heading"><div><p className="eyebrow">Product mix</p><h3>By category</h3></div><span className="panel-menu">:</span></div>
       <div className="category-content">
         <div className="category-donut" style={{ background: `conic-gradient(${stops.length ? stops.join(', ') : '#334155 0 100%'})` }}><div><strong>{totalProducts}</strong><span>Total</span></div></div>
-        <div className="category-legend">{visibleCategories.map((category, index) => <div key={category.category}><span className="legend-dot" style={{ background: colors[index] }} /> <span>{category.category}</span><strong>{category.percentage}%</strong></div>)}</div>
+        <div className="category-legend">{categories.map((category, index) => <div key={category.category}><span className="legend-dot" style={{ background: categoryColor(index) }} /> <span>{category.category}</span><strong>{category.percentage}%</strong></div>)}</div>
       </div>
     </section>
   );
