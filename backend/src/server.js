@@ -9,6 +9,7 @@ import { salesRouter } from './routes/salesRoutes.js';
 import { forecastRouter } from './routes/forecastRoutes.js';
 import { reportRouter } from './routes/reportRoutes.js';
 import { liveRouter } from './routes/liveRoutes.js';
+import { dashboardRouter } from './routes/dashboardRoutes.js';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/sales', salesRouter);
 app.use('/api/forecasts', forecastRouter);
 app.use('/api/reports', reportRouter);
 app.use('/api/live', liveRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
