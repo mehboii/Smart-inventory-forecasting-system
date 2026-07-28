@@ -19,12 +19,16 @@ const routes = {
   '/register': Register
 };
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 function currentPath() {
-  return window.location.pathname || '/';
+  const path = window.location.pathname;
+  if (basePath && path.startsWith(basePath)) return path.slice(basePath.length) || '/';
+  return path || '/';
 }
 
 export function navigate(path) {
-  window.history.pushState({}, '', path);
+  window.history.pushState({}, '', `${basePath}${path}`);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

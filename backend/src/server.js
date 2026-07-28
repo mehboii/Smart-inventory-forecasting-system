@@ -29,6 +29,7 @@ app.use(cors({ origin: (origin, callback) => callback(null, isAllowedOrigin(orig
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
+app.get('/', (_req, res) => res.redirect(302, process.env.CLIENT_ORIGIN || 'http://127.0.0.1:5173'));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRouter);
 app.use('/api/products', productRouter);
