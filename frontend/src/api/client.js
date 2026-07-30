@@ -1,7 +1,9 @@
 // Keep browser requests on the same origin during local development. Vite
 // proxies `/api` to Express, so the UI is not coupled to a hard-coded port or
 // host. Deployments can still supply the full backend URL through VITE_API_URL.
-const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+const configuredBasePath = (import.meta.env.VITE_BASE_PATH || '').replace(/^\/|\/$/g, '');
+const defaultApiUrl = configuredBasePath ? `/${configuredBasePath}/api` : '/api';
+const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '');
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('token');

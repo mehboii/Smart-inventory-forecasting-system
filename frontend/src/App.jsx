@@ -19,12 +19,28 @@ const routes = {
   '/register': Register
 };
 
+const configuredBasePath = (import.meta.env.VITE_BASE_PATH || '').replace(/^\/|\/$/g, '');
+const basePath = configuredBasePath ? `/${configuredBasePath}` : '';
+
+function stripBasePath(pathname) {
+  if (!basePath) return pathname || '/';
+  if (pathname === basePath) return '/';
+  if (pathname.startsWith(`${basePath}/`)) return pathname.slice(basePath.length) || '/';
+  return pathname || '/';
+}
+
+function withBasePath(path) {
+  if (!basePath) return path;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return normalizedPath === '/' ? `${basePath}/` : `${basePath}${normalizedPath}`;
+}
+
 function currentPath() {
-  return window.location.pathname || '/';
+  return stripBasePath(window.location.pathname || '/');
 }
 
 export function navigate(path) {
-  window.history.pushState({}, '', path);
+  window.history.pushState({}, '', withBasePath(path));
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

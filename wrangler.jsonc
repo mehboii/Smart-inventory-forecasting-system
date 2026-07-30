@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "smart-inventory-forecasting-system",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "route": "n11xcollective.me/Smartinventoryforecastingsystem*",
+  "assets": {
+    "directory": "./frontend/dist",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "run_worker_first": true
+  }
+}
