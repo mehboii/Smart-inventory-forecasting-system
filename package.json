@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm run dev --prefix backend & npm run dev --prefix frontend",
+    "dev": "concurrently --names api,web --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
@@ -13,7 +13,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
     "wrangler": "^4.116.0"
   }
 }

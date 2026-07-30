@@ -1,5 +1,5 @@
 import express from 'express';
-import { db, assertDb } from '../db/database.js';
+import { db } from '../db/database.js';
 import { authenticate } from '../middleware/auth.js';
 
 export const dashboardRouter = express.Router();
@@ -11,14 +11,19 @@ function isoDateDaysAgo(daysAgo) {
   return date.toISOString().slice(0, 10);
 }
 
-dashboardRouter.get('/', async (req, res) => {
+dashboardRouter.get('/', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const products = assertDb(await db.from('products').select('*').eq('user_id', req.user.id).order('name'));
-  const productIds = products.map((product) => product.id);
+  const products = db.prepare('SELECT * FROM products WHERE user_id = ? ORDER BY name ASC').all(req.user.id);
   const fromDate = isoDateDaysAgo(13);
-  const sales = productIds.length
-    ? assertDb(await db.from('sales_history').select('product_id, date, quantity_sold').in('product_id', productIds).gte('date', fromDate).order('date'))
-    : [];
+  const sales = db
+    .prepare(
+      `SELECT s.product_id, s.date, s.quantity_sold
+       FROM sales_history s
+       INNER JOIN products p ON p.id = s.product_id
+       WHERE p.user_id = ? AND s.date >= ?
+       ORDER BY s.date ASC`
+    )
+    .all(req.user.id, fromDate);
 
   const salesByProduct = new Map();
   const salesByDate = new Map();

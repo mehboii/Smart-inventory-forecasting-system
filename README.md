@@ -6,7 +6,7 @@ A full-stack university project for small-business inventory tracking and explai
 
 - Frontend: React, Vite, Tailwind CSS, Recharts
 - Backend: Node.js, Express
-- Database: Supabase Postgres through `@supabase/supabase-js`
+- Database: local SQLite through `better-sqlite3`
 - Auth: JWT plus bcrypt password hashing
 - Forecasting: Simple Moving Average and Exponential Smoothing
 
@@ -24,13 +24,12 @@ docs/      User-facing guide
 
 ```bash
 cd backend
-cp .env.example .env
 npm install
 npm run seed
 npm run dev
 ```
 
-Set `SUPABASE_URL` and `SUPABASE_KEY` in `backend/.env` using the project values. The schema has already been created in the connected Supabase project; the seed command writes demo data there.
+The backend creates `backend/data/inventory.db` automatically. No external database account or API key is required for local development. Optionally copy `.env.example` to `.env` to set a custom database path or JWT secret.
 
 The API runs at `http://localhost:4000`.
 
@@ -47,7 +46,6 @@ Open a second terminal:
 
 ```bash
 cd frontend
-cp .env.example .env
 npm install
 npm run dev
 ```
