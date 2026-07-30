@@ -113,6 +113,11 @@ export default function Dashboard() {
   const alerts = dashboard?.alerts || [];
   const salesTrend = dashboard?.salesTrend || [];
   const categoryMix = dashboard?.categoryMix || [];
+
+  if (!dashboard) {
+    return <div className="dashboard-page"><p className="dashboard-sync-error">{syncError || 'Loading dashboard data...'}</p></div>;
+  }
+
   const cardValues = [
     metrics?.totalProducts ?? 0,
     metrics?.lowStockItems ?? 0,

@@ -7,10 +7,16 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
+    "build:cloudflare": "VITE_BASE_PATH=/Smartinventoryforecastingsystem npm run build --prefix frontend",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "seed": "npm run seed --prefix backend"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
+    "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "wrangler": "^4.115.0"
+    "wrangler": "^4.116.0"
   }
 }

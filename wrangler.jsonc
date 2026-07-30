@@ -1,8 +1,14 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "smartinventoryforecastingsystem",
-  "main": "./cloudflare/worker.js",
-  "compatibility_date": "2026-07-28",
-  "assets": { "directory": "./frontend/dist", "not_found_handling": "single-page-application", "run_worker_first": ["/Smartinventoryforecastingsystem/api/*"] },
-  "d1_databases": [{ "binding": "DB", "database_name": "smart-inventory-forecasting-system", "database_id": "4cf49aed-5e47-4c81-8843-87f98b0ee957" }]
+  "name": "smart-inventory-forecasting-system",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "route": "n11xcollective.me/Smartinventoryforecastingsystem*",
+  "assets": {
+    "directory": "./frontend/dist",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "run_worker_first": true
+  }
 }
