@@ -36,6 +36,7 @@ salesRouter.post('/:productId', (req, res) => {
 
   const row = { date: req.body.date, quantity_sold: toPositiveInt(req.body.quantity_sold) };
   saveSalesRows(req.params.productId, [row]);
+  db.prepare('DELETE FROM forecasts WHERE product_id = ?').run(req.params.productId);
   return res.status(201).json({ sale: db.prepare('SELECT * FROM sales_history WHERE product_id = ? AND date = ?').get(req.params.productId, row.date) });
 });
 
@@ -48,5 +49,6 @@ salesRouter.post('/:productId/bulk', (req, res) => {
   if (!normalized.length) return res.status(400).json({ message: 'No valid sales rows provided' });
 
   saveSalesRows(req.params.productId, normalized);
+  db.prepare('DELETE FROM forecasts WHERE product_id = ?').run(req.params.productId);
   return res.status(201).json({ imported: normalized.length });
 });

@@ -65,6 +65,7 @@ export default function Forecasting() {
       await api(`/sales/${productId}`, { method: 'POST', body: JSON.stringify(manualSale) });
       const data = await api(`/sales/${productId}`);
       setSales(data.sales);
+      setForecast(null);
     } catch (saleError) {
       setError(saleError.message);
     }
@@ -80,6 +81,7 @@ export default function Forecasting() {
     setCsvText('');
     const data = await api(`/sales/${productId}`);
     setSales(data.sales);
+    setForecast(null);
   }
 
   async function runForecast() {

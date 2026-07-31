@@ -64,15 +64,17 @@ export function generateForecast({ productId, method = 'moving_average', horizon
       ? exponentialSmoothing(history, safeHorizon, safeAlpha)
       : movingAverage(history, safeHorizon, safeWindow);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const forecastBaseDate = lastDate > today ? lastDate : today;
   const series = predictions.map((predictedDemand, index) => ({
-    forecast_date: addDays(lastDate, index + 1),
+    forecast_date: addDays(forecastBaseDate, index + 1),
     predicted_demand: predictedDemand
   }));
 
   const totalPredictedDemand = predictions.reduce((sum, value) => sum + value, 0);
   const averageDailyDemand = totalPredictedDemand / predictions.length;
   const daysUntilStockout = averageDailyDemand > 0 ? product.current_stock / averageDailyDemand : null;
-  const likelyStockoutDate = daysUntilStockout === null ? null : addDays(new Date().toISOString().slice(0, 10), Math.floor(daysUntilStockout));
+  const likelyStockoutDate = daysUntilStockout === null ? null : addDays(today, Math.floor(daysUntilStockout));
   const leadTimeDemand = averageDailyDemand * product.lead_time_days;
   const reorderNeeded = product.current_stock <= product.reorder_point || product.current_stock < leadTimeDemand;
   const suggestedReorderQuantity = reorderNeeded

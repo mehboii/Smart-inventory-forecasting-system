@@ -195,11 +195,13 @@ async function generateForecast(db, { productId, method = 'moving_average', hori
   const predictions = method === 'exponential_smoothing'
     ? exponentialSmoothing(history, safeHorizon, safeAlpha)
     : movingAverage(history, safeHorizon, safeWindow);
-  const series = predictions.map((predictedDemand, index) => ({ forecast_date: addDays(lastDate, index + 1), predicted_demand: predictedDemand }));
+  const today = new Date().toISOString().slice(0, 10);
+  const forecastBaseDate = lastDate > today ? lastDate : today;
+  const series = predictions.map((predictedDemand, index) => ({ forecast_date: addDays(forecastBaseDate, index + 1), predicted_demand: predictedDemand }));
   const totalPredictedDemand = predictions.reduce((sum, value) => sum + value, 0);
   const averageDailyDemand = totalPredictedDemand / predictions.length;
   const daysUntilStockout = averageDailyDemand > 0 ? product.current_stock / averageDailyDemand : null;
-  const likelyStockoutDate = daysUntilStockout === null ? null : addDays(new Date().toISOString().slice(0, 10), Math.floor(daysUntilStockout));
+  const likelyStockoutDate = daysUntilStockout === null ? null : addDays(today, Math.floor(daysUntilStockout));
   const leadTimeDemand = averageDailyDemand * product.lead_time_days;
   const reorderNeeded = product.current_stock <= product.reorder_point || product.current_stock < leadTimeDemand;
   const suggestedReorderQuantity = reorderNeeded ? Math.max(0, Math.ceil(leadTimeDemand + product.reorder_point - product.current_stock)) : 0;
@@ -319,6 +321,7 @@ async function handleProducts(request, env, db, path) {
     if (error) return json({ message: error }, { status: 400 });
     const result = await db.from('products').update({ ...normalizeProduct(body), updated_at: new Date().toISOString() }).eq('id', productId).eq('user_id', user.id).select().single();
     if (result.error) return json({ message: result.error.code === '23505' ? 'SKU already exists' : 'Product update failed' }, { status: result.error.code === '23505' ? 409 : 500 });
+    assertDb(await db.from('forecasts').delete().eq('product_id', productId));
     return json({ product: result.data });
   }
   if (request.method === 'DELETE' && productId) {
@@ -347,12 +350,14 @@ async function handleSales(request, env, db, path) {
     if (!isIsoDate(body.date)) return json({ message: 'Date must use YYYY-MM-DD format' }, { status: 400 });
     const row = { date: body.date, quantity_sold: toPositiveInt(body.quantity_sold) };
     assertDb(await db.from('sales_history').upsert([{ product_id: productId, ...row }], { onConflict: 'product_id,date' }));
+    assertDb(await db.from('forecasts').delete().eq('product_id', productId));
     return json({ sale: assertDb(await db.from('sales_history').select('*').eq('product_id', productId).eq('date', row.date).single()) }, { status: 201 });
   }
   if (request.method === 'POST' && bulkMatch) {
     const normalized = (Array.isArray(body.rows) ? body.rows : []).filter((row) => isIsoDate(row.date)).map((row) => ({ date: row.date, quantity_sold: toPositiveInt(row.quantity_sold) }));
     if (!normalized.length) return json({ message: 'No valid sales rows provided' }, { status: 400 });
     assertDb(await db.from('sales_history').upsert(normalized.map((row) => ({ product_id: productId, ...row })), { onConflict: 'product_id,date' }));
+    assertDb(await db.from('forecasts').delete().eq('product_id', productId));
     return json({ imported: normalized.length }, { status: 201 });
   }
   return null;
@@ -401,8 +406,9 @@ async function handleDashboard(request, env, db, path) {
   const user = await authenticate(request, env);
   const products = assertDb(await db.from('products').select('*').eq('user_id', user.id).order('name'));
   const productIds = products.map((product) => product.id);
+  const fromDate = isoDateDaysAgo(13);
   const sales = productIds.length
-    ? assertDb(await db.from('sales_history').select('product_id, date, quantity_sold').in('product_id', productIds).gte('date', isoDateDaysAgo(13)).order('date'))
+    ? assertDb(await db.from('sales_history').select('product_id, date, quantity_sold').in('product_id', productIds).order('date'))
     : [];
   const salesByProduct = new Map();
   const salesByDate = new Map();
@@ -410,7 +416,7 @@ async function handleDashboard(request, env, db, path) {
     const productSales = salesByProduct.get(sale.product_id) || [];
     productSales.push(Number(sale.quantity_sold));
     salesByProduct.set(sale.product_id, productSales);
-    salesByDate.set(sale.date, (salesByDate.get(sale.date) || 0) + Number(sale.quantity_sold));
+    if (sale.date >= fromDate) salesByDate.set(sale.date, (salesByDate.get(sale.date) || 0) + Number(sale.quantity_sold));
   }
   const alerts = products.map((product) => {
     const recentSales = (salesByProduct.get(product.id) || []).slice(-7);
@@ -428,6 +434,7 @@ async function handleDashboard(request, env, db, path) {
   const dueForReorder = products.filter((product) => product.current_stock <= product.reorder_point + 5);
   const riskScore = products.length ? Math.round(Math.min(1000, ((lowStockItems.length * 0.65 + alerts.length * 0.35) / products.length) * 1000)) : 0;
   const categoryCounts = products.reduce((counts, product) => counts.set(product.category, (counts.get(product.category) || 0) + 1), new Map());
+  const alertIds = new Set(alerts.map((alert) => String(alert.id)));
 
   return json({
     metrics: {
@@ -438,7 +445,7 @@ async function handleDashboard(request, env, db, path) {
       openAlerts: alerts.length
     },
     risk: { score: riskScore, level: riskScore >= 700 ? 'High' : riskScore >= 400 ? 'Medium' : 'Low' },
-    products,
+    products: products.map((product) => ({ ...product, reorderNeeded: alertIds.has(String(product.id)) })),
     alerts,
     salesTrend: Array.from(salesByDate, ([date, quantitySold]) => ({ date, quantitySold })),
     categoryMix: Array.from(categoryCounts, ([category, count]) => ({ category, count, percentage: products.length ? Math.round((count / products.length) * 100) : 0 })).sort((a, b) => b.count - a.count),
