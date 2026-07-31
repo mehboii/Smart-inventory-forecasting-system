@@ -52,6 +52,7 @@ productRouter.put('/:id', (req, res) => {
       `UPDATE products SET name = ?, sku = ?, category = ?, current_stock = ?, reorder_point = ?, unit_cost = ?, lead_time_days = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND user_id = ?`
     ).run(product.name, product.sku, product.category, product.current_stock, product.reorder_point, product.unit_cost, product.lead_time_days, req.params.id, req.user.id);
+    db.prepare('DELETE FROM forecasts WHERE product_id = ?').run(req.params.id);
     publishInventoryUpdate(req.user.id, 'product');
     return res.json({ product: db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id) });
   } catch (updateError) {

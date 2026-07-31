@@ -155,7 +155,7 @@ export default function Dashboard() {
           <table className="details-table w-full text-left text-sm">
             <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Stock</th><th>Reorder point</th><th>Status</th></tr></thead>
             <tbody>{products.slice(0, 6).map((product) => {
-              const low = product.current_stock <= product.reorder_point;
+              const low = product.reorderNeeded ?? product.current_stock <= product.reorder_point;
               return <tr key={product.id}><td className="font-medium">{product.name}</td><td>{product.sku}</td><td>{product.category}</td><td>{product.current_stock}</td><td>{product.reorder_point}</td><td><span className={`status-label ${low ? 'status-warning' : 'status-ready'}`}>{low ? 'Review' : 'Healthy'}</span></td></tr>;
             })}</tbody>
           </table>

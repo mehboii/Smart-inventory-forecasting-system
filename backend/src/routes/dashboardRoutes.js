@@ -20,10 +20,10 @@ dashboardRouter.get('/', (req, res) => {
       `SELECT s.product_id, s.date, s.quantity_sold
        FROM sales_history s
        INNER JOIN products p ON p.id = s.product_id
-       WHERE p.user_id = ? AND s.date >= ?
+       WHERE p.user_id = ?
        ORDER BY s.date ASC`
     )
-    .all(req.user.id, fromDate);
+    .all(req.user.id);
 
   const salesByProduct = new Map();
   const salesByDate = new Map();
@@ -31,7 +31,7 @@ dashboardRouter.get('/', (req, res) => {
     const productSales = salesByProduct.get(sale.product_id) || [];
     productSales.push(Number(sale.quantity_sold));
     salesByProduct.set(sale.product_id, productSales);
-    salesByDate.set(sale.date, (salesByDate.get(sale.date) || 0) + Number(sale.quantity_sold));
+    if (sale.date >= fromDate) salesByDate.set(sale.date, (salesByDate.get(sale.date) || 0) + Number(sale.quantity_sold));
   }
 
   const alerts = products.map((product) => {
@@ -57,6 +57,7 @@ dashboardRouter.get('/', (req, res) => {
     return counts;
   }, new Map());
 
+  const alertIds = new Set(alerts.map((alert) => alert.id));
   return res.json({
     metrics: {
       totalProducts: products.length,
@@ -66,7 +67,7 @@ dashboardRouter.get('/', (req, res) => {
       openAlerts: alerts.length
     },
     risk: { score: riskScore, level: riskScore >= 700 ? 'High' : riskScore >= 400 ? 'Medium' : 'Low' },
-    products,
+    products: products.map((product) => ({ ...product, reorderNeeded: alertIds.has(product.id) })),
     alerts,
     salesTrend: Array.from({ length: 14 }, (_, index) => {
       const date = isoDateDaysAgo(13 - index);
