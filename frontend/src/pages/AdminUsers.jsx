@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const roles = ['user', 'manager', 'admin'];
 
@@ -8,7 +9,9 @@ function inviteLink(token) {
 }
 
 export default function AdminUsers() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
+  const [ownerId, setOwnerId] = useState(null);
   const [invitations, setInvitations] = useState([]);
   const [form, setForm] = useState({ email: '', role: 'user' });
   const [message, setMessage] = useState('');
@@ -17,6 +20,7 @@ export default function AdminUsers() {
   const load = useCallback(async () => {
     const [userData, invitationData] = await Promise.all([api('/auth/admin/users'), api('/auth/admin/invitations')]);
     setUsers(userData.users);
+    setOwnerId(userData.ownerId);
     setInvitations(invitationData.invitations);
   }, []);
 
@@ -43,6 +47,15 @@ export default function AdminUsers() {
     } catch (roleError) { setError(roleError.message); }
   }
 
+  async function removeUser(member) {
+    if (!window.confirm(`Remove ${member.name} from the team? Their account data will be deleted.`)) return;
+    setError('');
+    try {
+      await api(`/auth/admin/users/${member.id}`, { method: 'DELETE' });
+      setUsers((current) => current.filter((user) => user.id !== member.id));
+    } catch (removeError) { setError(removeError.message); }
+  }
+
   return (
     <section>
       <p className="eyebrow">Administration</p>
@@ -60,8 +73,8 @@ export default function AdminUsers() {
       <div className="card mt-6 overflow-x-auto">
         <h3 className="text-lg font-semibold">Registered users</h3>
         <table className="mt-4 w-full text-left text-sm">
-          <thead><tr className="border-b"><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Role</th></tr></thead>
-          <tbody>{users.map((user) => <tr className="border-b" key={user.id}><td className="p-2">{user.name}</td><td className="p-2">{user.email}</td><td className="p-2"><select className="input py-1" value={user.role} onChange={(event) => changeRole(user.id, event.target.value)}>{roles.map((role) => <option key={role} value={role}>{role}</option>)}</select></td></tr>)}</tbody>
+          <thead><tr className="border-b"><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Role</th><th className="p-2">Access</th></tr></thead>
+          <tbody>{users.map((member) => { const isOwner = String(member.id) === String(ownerId); const canRemove = !isOwner && (String(currentUser?.id) === String(ownerId) || member.role !== 'admin'); return <tr className="border-b" key={member.id}><td className="p-2">{member.name}{isOwner && <span className="ml-2 text-xs font-semibold text-blue-700">Main owner</span>}</td><td className="p-2">{member.email}</td><td className="p-2"><select className="input py-1" value={member.role} disabled={isOwner} onChange={(event) => changeRole(member.id, event.target.value)}>{roles.map((role) => <option key={role} value={role}>{role}</option>)}</select></td><td className="p-2">{canRemove ? <button className="btn-secondary px-3 py-1 text-sm" onClick={() => removeUser(member)}>Remove</button> : <span className="text-xs text-slate-500">{isOwner ? 'Protected' : 'Owner only'}</span>}</td></tr>; })}</tbody>
         </table>
       </div>
       <div className="card mt-6 overflow-x-auto">

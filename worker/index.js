@@ -309,7 +309,11 @@ async function handleAuth(request, env, db, path) {
   }
   if (path.startsWith('/auth/admin/') && currentUser.role !== 'admin') return json({ message: 'Admin role required' }, { status: 403 });
   if (request.method === 'GET' && path === '/auth/admin/users') {
-    return json({ users: assertDb(await db.from('users').select('id,name,email,role,created_at').order('created_at')) });
+    const [users, owner] = await Promise.all([
+      db.from('users').select('id,name,email,role,created_at').order('created_at'),
+      db.from('users').select('id').eq('role', 'admin').order('created_at').limit(1).maybeSingle()
+    ]);
+    return json({ users: assertDb(users), ownerId: assertDb(owner)?.id || null });
   }
   const userRoleMatch = path.match(/^\/auth\/admin\/users\/([^/]+)\/role$/);
   if (request.method === 'PATCH' && userRoleMatch) {
@@ -317,12 +321,24 @@ async function handleAuth(request, env, db, path) {
     if (!validRole(role)) return json({ message: 'Role must be admin, manager, or user' }, { status: 400 });
     const target = assertDb(await db.from('users').select('*').eq('id', userRoleMatch[1]).maybeSingle());
     if (!target) return json({ message: 'User not found' }, { status: 404 });
+    const owner = assertDb(await db.from('users').select('id').eq('role', 'admin').order('created_at').limit(1).maybeSingle());
+    if (String(target.id) === String(owner?.id)) return json({ message: 'The main owner role cannot be changed' }, { status: 403 });
     if (target.role === 'admin' && role !== 'admin') {
       const admins = assertDb(await db.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin'));
       if (admins.count === 1) return json({ message: 'At least one administrator must remain' }, { status: 400 });
     }
     const updated = assertDb(await db.from('users').update({ role }).eq('id', target.id).select().single());
     return json({ user: publicUser(updated) });
+  }
+  const deleteUserMatch = path.match(/^\/auth\/admin\/users\/([^/]+)$/);
+  if (request.method === 'DELETE' && deleteUserMatch) {
+    const target = assertDb(await db.from('users').select('*').eq('id', deleteUserMatch[1]).maybeSingle());
+    if (!target) return json({ message: 'User not found' }, { status: 404 });
+    const owner = assertDb(await db.from('users').select('id').eq('role', 'admin').order('created_at').limit(1).maybeSingle());
+    if (String(target.id) === String(owner?.id)) return json({ message: 'The main owner cannot be removed' }, { status: 403 });
+    if (target.role === 'admin' && String(currentUser.id) !== String(owner?.id)) return json({ message: 'Only the main owner can remove another administrator' }, { status: 403 });
+    assertDb(await db.from('users').delete().eq('id', target.id));
+    return json({ message: 'User removed' });
   }
   if (request.method === 'GET' && path === '/auth/admin/invitations') {
     return json({ invitations: assertDb(await db.from('invitations').select('id,email,role,token,expires_at,accepted_at,created_at').order('created_at', { ascending: false })) });
