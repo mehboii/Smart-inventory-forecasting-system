@@ -97,6 +97,7 @@ The first value is the sale date in `YYYY-MM-DD` format. The second value is qua
 - `GET /api/auth/me`
 - `GET /api/auth/team`
 - `GET|POST /api/auth/admin/invitations`
+- `DELETE /api/auth/admin/invitations/:id`
 - `GET /api/auth/admin/users`
 - `PATCH /api/auth/admin/users/:id/role`
 - `DELETE /api/auth/admin/users/:id`

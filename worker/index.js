@@ -353,6 +353,11 @@ async function handleAuth(request, env, db, path) {
     const invitation = assertDb(await db.from('invitations').insert({ email, role, token: randomToken(), invited_by: String(currentUser.id), expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }).select('id,email,role,token,expires_at,accepted_at,created_at').single());
     return json({ invitation }, { status: 201 });
   }
+  const invitationMatch = path.match(/^\/auth\/admin\/invitations\/([^/]+)$/);
+  if (request.method === 'DELETE' && invitationMatch) {
+    const deleted = assertDb(await db.from('invitations').delete().eq('id', invitationMatch[1]).is('accepted_at', null).select('id'));
+    return deleted.length ? json({ message: 'Invitation cancelled' }) : json({ message: 'Pending invitation not found' }, { status: 404 });
+  }
   if (request.method === 'GET' && path === '/auth/me') {
     return currentUser ? json({ user: publicUser(currentUser) }) : json({ message: 'User not found' }, { status: 404 });
   }
