@@ -41,6 +41,8 @@ function productInput(body) {
   return [String(body.name || '').trim(), String(body.sku || '').trim(), String(body.category || '').trim(), Math.max(0, Number.parseInt(body.current_stock, 10) || 0), Math.max(0, Number.parseInt(body.reorder_point, 10) || 0), Math.max(0, Number(body.unit_cost) || 0), Math.max(1, Number.parseInt(body.lead_time_days, 10) || 7)];
 }
 
+const validRole = (role) => ['admin', 'manager', 'user'].includes(role);
+
 async function dashboard(env, user) {
   const products = (await env.DB.prepare('SELECT * FROM products WHERE user_id = ? ORDER BY name').bind(user.id).all()).results;
   const sales = (await env.DB.prepare(`SELECT s.product_id, s.date, s.quantity_sold FROM sales_history s JOIN products p ON p.id=s.product_id WHERE p.user_id=? AND s.date>=? ORDER BY s.date`).bind(user.id, dateOnly(-13)).all()).results;
@@ -56,8 +58,27 @@ async function api(request, env, path) {
   const body = method === 'GET' || method === 'DELETE' ? {} : await request.json().catch(() => ({}));
   if (path === '/health') return json({ status: 'ok' });
   if (path === '/auth/login' && method === 'POST') { const user = await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(String(body.email || '').toLowerCase()).first(); if (!user || user.password_hash !== await passwordHash(body.password)) return fail('Invalid email or password', 401); const value = token(); await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').bind(value, user.id, new Date(Date.now() + 604800000).toISOString()).run(); return json({ token: value, user: publicUser(user) }); }
-  if (path === '/auth/register' && method === 'POST') { if (!body.name || !body.email || String(body.password || '').length < 6) return fail('Name, email, and a 6-character password are required'); try { const result = await env.DB.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').bind(String(body.name).trim(), String(body.email).trim().toLowerCase(), await passwordHash(body.password), body.role === 'admin' ? 'admin' : 'user').run(); const user = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(result.meta.last_row_id).first(); const value = token(); await env.DB.prepare('INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,?)').bind(value,user.id,new Date(Date.now()+604800000).toISOString()).run(); return json({ token: value, user: publicUser(user) }, 201); } catch { return fail('Email already registered', 409); } }
+  if (path === '/auth/register' && method === 'POST') {
+    if (!body.name || !body.email || String(body.password || '').length < 6) return fail('Name, email, and a 6-character password are required');
+    const email = String(body.email).trim().toLowerCase();
+    const adminCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE role='admin'").first();
+    let role = 'user';
+    if (adminCount.count === 0) role = 'admin';
+    else {
+      const invitation = await env.DB.prepare("SELECT * FROM invitations WHERE token=? AND email=? AND accepted_at IS NULL AND expires_at > datetime('now')").bind(String(body.inviteToken || ''), email).first();
+      if (!invitation) return fail('An active invitation is required. Ask an administrator to invite you.', 403);
+      role = invitation.role;
+      body.invitationId = invitation.id;
+    }
+    try { const result = await env.DB.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').bind(String(body.name).trim(), email, await passwordHash(body.password), role).run(); if (body.invitationId) await env.DB.prepare('UPDATE invitations SET accepted_at=CURRENT_TIMESTAMP WHERE id=?').bind(body.invitationId).run(); const user = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(result.meta.last_row_id).first(); const value = token(); await env.DB.prepare('INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,?)').bind(value,user.id,new Date(Date.now()+604800000).toISOString()).run(); return json({ token: value, user: publicUser(user) }, 201); } catch { return fail('Email already registered', 409); }
+  }
   const user = await requireUser(request, env);
+  if (path.startsWith('/auth/admin/') && user.role !== 'admin') return fail('Admin role required', 403);
+  if (path === '/auth/admin/users' && method === 'GET') return json({ users: (await env.DB.prepare('SELECT id,name,email,role,created_at FROM users ORDER BY created_at').all()).results });
+  const userRoleMatch = path.match(/^\/auth\/admin\/users\/(\d+)\/role$/);
+  if (userRoleMatch && method === 'PATCH') { const role = String(body.role || ''); const id = Number(userRoleMatch[1]); if (!validRole(role)) return fail('Role must be admin, manager, or user'); const target = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(id).first(); if (!target) return fail('User not found', 404); const admins = await env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE role='admin'").first(); if (target.role === 'admin' && role !== 'admin' && admins.count === 1) return fail('At least one administrator must remain'); await env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(role,id).run(); return json({ user: publicUser(await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(id).first()) }); }
+  if (path === '/auth/admin/invitations' && method === 'GET') return json({ invitations: (await env.DB.prepare('SELECT id,email,role,token,expires_at,accepted_at,created_at FROM invitations ORDER BY created_at DESC').all()).results });
+  if (path === '/auth/admin/invitations' && method === 'POST') { const email = String(body.email || '').trim().toLowerCase(); const role = String(body.role || 'user'); if (!/^\S+@\S+\.\S+$/.test(email)) return fail('A valid email is required'); if (!validRole(role)) return fail('Role must be admin, manager, or user'); if (await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(email).first()) return fail('This email is already registered',409); const value = token(); const result = await env.DB.prepare("INSERT INTO invitations (email,role,token,invited_by,expires_at) VALUES (?,?,?,?,datetime('now','+7 days'))").bind(email,role,value,user.id).run(); return json({ invitation: await env.DB.prepare('SELECT id,email,role,token,expires_at,accepted_at,created_at FROM invitations WHERE id=?').bind(result.meta.last_row_id).first() }, 201); }
   if (path === '/auth/me') return json({ user: publicUser(user) });
   if (path === '/auth/walkthrough' && method === 'PATCH') { await env.DB.prepare('UPDATE users SET has_seen_walkthrough=1 WHERE id=?').bind(user.id).run(); return json({ user: { ...publicUser(user), has_seen_walkthrough: true } }); }
   if (path === '/auth/logout' && method === 'POST') return json({ message: 'Logged out' });

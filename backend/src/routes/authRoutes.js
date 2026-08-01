@@ -2,6 +2,8 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/database.js';
 import { authenticate, createToken } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/auth.js';
+import crypto from 'crypto';
 import { requireFields } from '../utils/validators.js';
 
 export const authRouter = express.Router();
@@ -21,12 +23,24 @@ authRouter.post('/register', async (req, res) => {
   if (error) return res.status(400).json({ message: error });
   if (String(req.body.password).length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
 
+  const email = req.body.email.trim().toLowerCase();
   const passwordHash = await bcrypt.hash(req.body.password, 10);
   try {
+    const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").get().count;
+    let role = 'user';
+    if (adminCount === 0) {
+      role = 'admin';
+    } else {
+      const invitation = db.prepare("SELECT * FROM invitations WHERE token = ? AND email = ? AND accepted_at IS NULL AND expires_at > datetime('now')").get(String(req.body.inviteToken || ''), email);
+      if (!invitation) return res.status(403).json({ message: 'An active invitation is required. Ask an administrator to invite you.' });
+      role = invitation.role;
+      req.invitationId = invitation.id;
+    }
     const result = db
       .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-      .run(req.body.name.trim(), req.body.email.trim().toLowerCase(), passwordHash, req.body.role === 'admin' ? 'admin' : 'user');
+      .run(req.body.name.trim(), email, passwordHash, role);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+    if (req.invitationId) db.prepare("UPDATE invitations SET accepted_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.invitationId);
     const token = createToken(user);
     res.cookie('token', token, { httpOnly: true, sameSite: 'lax', secure: false });
     return res.status(201).json({ token, user: publicUser(user) });
@@ -34,6 +48,39 @@ authRouter.post('/register', async (req, res) => {
     if (insertError.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ message: 'Email already registered' });
     return res.status(500).json({ message: 'Registration failed' });
   }
+});
+
+authRouter.get('/admin/users', authenticate, requireAdmin, (req, res) => {
+  const users = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY created_at').all();
+  return res.json({ users });
+});
+
+authRouter.patch('/admin/users/:id/role', authenticate, requireAdmin, (req, res) => {
+  const role = String(req.body.role || '');
+  if (!['admin', 'manager', 'user'].includes(role)) return res.status(400).json({ message: 'Role must be admin, manager, or user' });
+  const id = Number(req.params.id);
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  if (!target) return res.status(404).json({ message: 'User not found' });
+  if (target.role === 'admin' && role !== 'admin' && db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").get().count === 1) return res.status(400).json({ message: 'At least one administrator must remain' });
+  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+  return res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id)) });
+});
+
+authRouter.get('/admin/invitations', authenticate, requireAdmin, (req, res) => {
+  const invitations = db.prepare('SELECT id, email, role, token, expires_at, accepted_at, created_at FROM invitations ORDER BY created_at DESC').all();
+  return res.json({ invitations });
+});
+
+authRouter.post('/admin/invitations', authenticate, requireAdmin, (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const role = String(req.body.role || 'user');
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: 'A valid email is required' });
+  if (!['admin', 'manager', 'user'].includes(role)) return res.status(400).json({ message: 'Role must be admin, manager, or user' });
+  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ message: 'This email is already registered' });
+  const token = crypto.randomBytes(32).toString('hex');
+  const result = db.prepare("INSERT INTO invitations (email, role, token, invited_by, expires_at) VALUES (?, ?, ?, ?, datetime('now', '+7 days'))").run(email, role, token, req.user.id);
+  const invitation = db.prepare('SELECT id, email, role, token, expires_at, accepted_at, created_at FROM invitations WHERE id = ?').get(result.lastInsertRowid);
+  return res.status(201).json({ invitation });
 });
 
 authRouter.post('/login', async (req, res) => {

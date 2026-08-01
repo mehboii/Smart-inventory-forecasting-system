@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { db } from '../db/database.js';
 
 const secret = process.env.JWT_SECRET || 'development_secret_change_me';
 
@@ -24,7 +25,8 @@ export function authenticate(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  const user = req.user?.id && db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.id);
+  if (user?.role !== 'admin') {
     return res.status(403).json({ message: 'Admin role required' });
   }
   return next();

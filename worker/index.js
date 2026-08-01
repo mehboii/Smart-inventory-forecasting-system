@@ -125,6 +125,16 @@ function publicUser(user) {
   return { id: user.id, name: user.name, email: user.email, role: user.role, has_seen_walkthrough: Boolean(user.has_seen_walkthrough) };
 }
 
+function randomToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function validRole(role) {
+  return ['admin', 'manager', 'user'].includes(role);
+}
+
 function normalizeProduct(body) {
   return {
     name: String(body.name || '').trim(),
@@ -251,14 +261,27 @@ async function handleAuth(request, env, db, path) {
     const error = requireFields(body, ['name', 'email', 'password']);
     if (error) return json({ message: error }, { status: 400 });
     if (String(body.password).length < 6) return json({ message: 'Password must be at least 6 characters' }, { status: 400 });
+    const email = body.email.trim().toLowerCase();
+    const admins = await db.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin');
+    if (admins.error) return json({ message: 'Registration failed' }, { status: 500 });
+    let role = 'user';
+    let invitation;
+    if (admins.count === 0) {
+      role = 'admin';
+    } else {
+      invitation = assertDb(await db.from('invitations').select('*').eq('token', String(body.inviteToken || '')).eq('email', email).is('accepted_at', null).gt('expires_at', new Date().toISOString()).maybeSingle());
+      if (!invitation) return json({ message: 'An active invitation is required. Ask an administrator to invite you.' }, { status: 403 });
+      role = invitation.role;
+    }
     const password_hash = await bcrypt.hash(body.password, 10);
     const result = await db.from('users').insert({
       name: body.name.trim(),
-      email: body.email.trim().toLowerCase(),
+      email,
       password_hash,
-      role: body.role === 'admin' ? 'admin' : 'user'
+      role
     }).select().single();
     if (result.error) return json({ message: result.error.code === '23505' ? 'Email already registered' : 'Registration failed' }, { status: result.error.code === '23505' ? 409 : 500 });
+    if (invitation) assertDb(await db.from('invitations').update({ accepted_at: new Date().toISOString() }).eq('id', invitation.id));
     const token = await createToken(result.data, env);
     return json({ token, user: publicUser(result.data) }, { status: 201, headers: { 'Set-Cookie': `token=${token}; HttpOnly; SameSite=Lax; Secure; Path=${APP_PREFIX}; Max-Age=${TOKEN_TTL_SECONDS}` } });
   }
@@ -277,8 +300,39 @@ async function handleAuth(request, env, db, path) {
   }
 
   const user = await authenticate(request, env);
+  const currentUser = assertDb(await db.from('users').select('*').eq('id', user.id).maybeSingle());
+  if (!currentUser) return json({ message: 'User not found' }, { status: 404 });
+  if (path.startsWith('/auth/admin/') && currentUser.role !== 'admin') return json({ message: 'Admin role required' }, { status: 403 });
+  if (request.method === 'GET' && path === '/auth/admin/users') {
+    return json({ users: assertDb(await db.from('users').select('id,name,email,role,created_at').order('created_at')) });
+  }
+  const userRoleMatch = path.match(/^\/auth\/admin\/users\/([^/]+)\/role$/);
+  if (request.method === 'PATCH' && userRoleMatch) {
+    const role = String(body.role || '');
+    if (!validRole(role)) return json({ message: 'Role must be admin, manager, or user' }, { status: 400 });
+    const target = assertDb(await db.from('users').select('*').eq('id', userRoleMatch[1]).maybeSingle());
+    if (!target) return json({ message: 'User not found' }, { status: 404 });
+    if (target.role === 'admin' && role !== 'admin') {
+      const admins = assertDb(await db.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin'));
+      if (admins.count === 1) return json({ message: 'At least one administrator must remain' }, { status: 400 });
+    }
+    const updated = assertDb(await db.from('users').update({ role }).eq('id', target.id).select().single());
+    return json({ user: publicUser(updated) });
+  }
+  if (request.method === 'GET' && path === '/auth/admin/invitations') {
+    return json({ invitations: assertDb(await db.from('invitations').select('id,email,role,token,expires_at,accepted_at,created_at').order('created_at', { ascending: false })) });
+  }
+  if (request.method === 'POST' && path === '/auth/admin/invitations') {
+    const email = String(body.email || '').trim().toLowerCase();
+    const role = String(body.role || 'user');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return json({ message: 'A valid email is required' }, { status: 400 });
+    if (!validRole(role)) return json({ message: 'Role must be admin, manager, or user' }, { status: 400 });
+    const existing = assertDb(await db.from('users').select('id').eq('email', email).maybeSingle());
+    if (existing) return json({ message: 'This email is already registered' }, { status: 409 });
+    const invitation = assertDb(await db.from('invitations').insert({ email, role, token: randomToken(), invited_by: String(currentUser.id), expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }).select('id,email,role,token,expires_at,accepted_at,created_at').single());
+    return json({ invitation }, { status: 201 });
+  }
   if (request.method === 'GET' && path === '/auth/me') {
-    const currentUser = assertDb(await db.from('users').select('*').eq('id', user.id).maybeSingle());
     return currentUser ? json({ user: publicUser(currentUser) }) : json({ message: 'User not found' }, { status: 404 });
   }
   if (request.method === 'PATCH' && path === '/auth/walkthrough') {

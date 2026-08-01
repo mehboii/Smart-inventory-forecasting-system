@@ -52,7 +52,7 @@ frontend and API are deployed on different hosts.
 
 ## Main Features
 
-- Register and login with JWT authentication.
+- The first account becomes the database administrator. Administrators invite team members and assign their roles; subsequent registrations require a valid invitation.
 - View dashboard summary cards for total products, low-stock items, reorder items, and inventory value.
 - Create, update, and delete products.
 - Enter dated sales history manually or paste CSV rows.
@@ -61,6 +61,12 @@ frontend and API are deployed on different hosts.
 - Display stockout risk, reorder-by date, and suggested reorder quantity.
 - Export current inventory and saved forecast rows as CSV.
 - Use the in-app Help page and first-login walkthrough.
+
+## Deployed database update
+
+Before deploying the Worker, apply
+`supabase/migrations/20260802000000_add_invitations.sql` in the Supabase SQL
+Editor. It creates the table used to store admin-issued invitations.
 
 ## Forecasting Methods
 
@@ -89,6 +95,9 @@ The first value is the sale date in `YYYY-MM-DD` format. The second value is qua
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `GET|POST /api/auth/admin/invitations`
+- `GET /api/auth/admin/users`
+- `PATCH /api/auth/admin/users/:id/role`
 - `GET /api/products`
 - `POST /api/products`
 - `PUT /api/products/:id`

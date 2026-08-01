@@ -31,7 +31,7 @@ export default function Login() {
         <input className="input mt-1" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         <button className="btn mt-5 w-full">Login</button>
         <p className="mt-4 text-center text-sm text-slate-600">
-          No account? <button className="font-semibold text-blue-700" type="button" onClick={() => navigate('/register')}>Register</button>
+          Need an account? Ask your administrator to send you an invitation.
         </p>
       </form>
     </div>
