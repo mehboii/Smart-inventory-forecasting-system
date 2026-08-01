@@ -103,6 +103,12 @@ authRouter.post('/admin/invitations', authenticate, requireAdmin, (req, res) => 
   return res.status(201).json({ invitation });
 });
 
+authRouter.delete('/admin/invitations/:id', authenticate, requireAdmin, (req, res) => {
+  const result = db.prepare('DELETE FROM invitations WHERE id = ? AND accepted_at IS NULL').run(Number(req.params.id));
+  if (!result.changes) return res.status(404).json({ message: 'Pending invitation not found' });
+  return res.json({ message: 'Invitation cancelled' });
+});
+
 authRouter.post('/login', async (req, res) => {
   const error = requireFields(req.body, ['email', 'password']);
   if (error) return res.status(400).json({ message: error });

@@ -64,6 +64,15 @@ export default function AdminUsers() {
     } catch (removeError) { setError(removeError.message); }
   }
 
+  async function cancelInvitation(invitation) {
+    if (!window.confirm(`Cancel the invitation for ${invitation.email}? Its link will stop working immediately.`)) return;
+    setError('');
+    try {
+      await api(`/auth/admin/invitations/${invitation.id}`, { method: 'DELETE' });
+      setInvitations((current) => current.filter((item) => item.id !== invitation.id));
+    } catch (cancelError) { setError(cancelError.message); }
+  }
+
   return (
     <section>
       <p className="eyebrow">Administration</p>
@@ -87,7 +96,7 @@ export default function AdminUsers() {
       </div>
       <div className="card mt-6 overflow-x-auto">
         <h3 className="text-lg font-semibold">Pending invitations</h3>
-        <table className="mt-4 w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Email</th><th className="p-2">Role</th><th className="p-2">Status</th></tr></thead><tbody>{invitations.map((invite) => <tr className="border-b" key={invite.id}><td className="p-2">{invite.email}</td><td className="p-2">{invite.role}</td><td className="p-2">{invite.accepted_at ? 'Accepted' : 'Pending'}</td></tr>)}</tbody></table>
+        <table className="mt-4 w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Email</th><th className="p-2">Role</th><th className="p-2">Status</th><th className="p-2">Action</th></tr></thead><tbody>{invitations.map((invite) => <tr className="border-b" key={invite.id}><td className="p-2">{invite.email}</td><td className="p-2">{invite.role}</td><td className="p-2">{invite.accepted_at ? 'Accepted' : 'Pending'}</td><td className="p-2">{!invite.accepted_at && <button className="btn-secondary px-3 py-1 text-sm" onClick={() => cancelInvitation(invite)}>Cancel invite</button>}</td></tr>)}</tbody></table>
       </div>
     </section>
   );
