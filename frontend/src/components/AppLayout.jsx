@@ -44,6 +44,14 @@ export function AppLayout({ children, currentPath }) {
               </div>
             </div>
           ))}
+          {user?.role === 'admin' && (
+            <div className="nav-group">
+              <p className="nav-group-title">Administration</p>
+              <button onClick={() => navigate('/admin/users')} className={`nav-link ${currentPath === '/admin/users' ? 'nav-link-active' : ''}`}>
+                <span className="nav-icon">US</span> Team access
+              </button>
+            </div>
+          )}
         </nav>
         <div className="sidebar-footer">
           <button className="btn-secondary w-full" onClick={handleLogout}>Logout</button>

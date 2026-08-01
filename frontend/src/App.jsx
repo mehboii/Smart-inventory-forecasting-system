@@ -8,12 +8,14 @@ import Inventory from './pages/Inventory.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Reports from './pages/Reports.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
 
 const routes = {
   '/': Dashboard,
   '/inventory': Inventory,
   '/forecasting': Forecasting,
   '/reports': Reports,
+  '/admin/users': AdminUsers,
   '/help': Help,
   '/login': Login,
   '/register': Register
