@@ -4,7 +4,7 @@
 
 This system helps a small business manage inventory, record sales, predict future demand, and identify products that need to be reordered. It is built as a full-stack web application for inventory management and demand forecasting.
 
-## Technology Used
+## Technology Used.
 
 | Layer | Technology | Purpose |
 | --- | --- | --- |
