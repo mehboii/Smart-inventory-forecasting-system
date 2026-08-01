@@ -1,4 +1,4 @@
-# Smart Inventory Forecasting System
+# Smart Inventory Forecasting System.
 
 ## Purpose
 
