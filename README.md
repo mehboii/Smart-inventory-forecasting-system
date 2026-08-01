@@ -33,13 +33,6 @@ The backend creates `backend/data/inventory.db` automatically. No external datab
 
 The API runs at `http://localhost:4000`.
 
-Demo login:
-
-```text
-Email: demo@inventory.edu
-Password: password123
-```
-
 ### 2. Frontend
 
 Open a second terminal:
@@ -110,4 +103,4 @@ The first value is the sale date in `YYYY-MM-DD` format. The second value is qua
 
 - Forecasting logic lives in `backend/src/services/forecastService.js`, not inside the route handler.
 - Data is stored in Supabase Postgres and survives closing or restarting the app.
-- The seed script creates 12 products and 90 days of sales history per product.
+- The development reset script clears local data and does not insert demo records.

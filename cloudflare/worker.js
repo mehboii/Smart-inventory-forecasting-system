@@ -37,21 +37,6 @@ async function requireUser(request, env) {
   return user;
 }
 
-async function bootstrap(env) {
-  const present = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind('demo@inventory.edu').first();
-  if (present) return;
-  const hash = await passwordHash('password123');
-  const user = await env.DB.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').bind('Demo Owner', 'demo@inventory.edu', hash, 'admin').run();
-  const id = user.meta.last_row_id;
-  const products = [
-    ['Arabica Coffee Beans', 'COF-001', 'Beverages', 42, 30, 11.5, 7],
-    ['Oat Milk Cartons', 'DRY-102', 'Dairy Alternatives', 22, 25, 2.4, 5],
-    ['Paper Cups 12oz', 'SUP-210', 'Supplies', 310, 150, 0.08, 10],
-    ['Blueberry Muffins', 'BAK-044', 'Bakery', 18, 20, 1.1, 2]
-  ];
-  await env.DB.batch(products.map((p) => env.DB.prepare('INSERT INTO products (user_id, name, sku, category, current_stock, reorder_point, unit_cost, lead_time_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, ...p)));
-}
-
 function productInput(body) {
   return [String(body.name || '').trim(), String(body.sku || '').trim(), String(body.category || '').trim(), Math.max(0, Number.parseInt(body.current_stock, 10) || 0), Math.max(0, Number.parseInt(body.reorder_point, 10) || 0), Math.max(0, Number(body.unit_cost) || 0), Math.max(1, Number.parseInt(body.lead_time_days, 10) || 7)];
 }
@@ -67,7 +52,6 @@ async function dashboard(env, user) {
 }
 
 async function api(request, env, path) {
-  await bootstrap(env);
   const method = request.method;
   const body = method === 'GET' || method === 'DELETE' ? {} : await request.json().catch(() => ({}));
   if (path === '/health') return json({ status: 'ok' });
