@@ -58,7 +58,8 @@ authRouter.get('/team', authenticate, (_req, res) => {
 
 authRouter.get('/admin/users', authenticate, requireAdmin, (req, res) => {
   const users = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY created_at').all();
-  return res.json({ users });
+  const owner = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1").get();
+  return res.json({ users, ownerId: owner?.id || null });
 });
 
 authRouter.patch('/admin/users/:id/role', authenticate, requireAdmin, (req, res) => {
@@ -67,9 +68,22 @@ authRouter.patch('/admin/users/:id/role', authenticate, requireAdmin, (req, res)
   const id = Number(req.params.id);
   const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!target) return res.status(404).json({ message: 'User not found' });
+  const owner = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1").get();
+  if (target.id === owner?.id) return res.status(403).json({ message: 'The main owner role cannot be changed' });
   if (target.role === 'admin' && role !== 'admin' && db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").get().count === 1) return res.status(400).json({ message: 'At least one administrator must remain' });
   db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
   return res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id)) });
+});
+
+authRouter.delete('/admin/users/:id', authenticate, requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  if (!target) return res.status(404).json({ message: 'User not found' });
+  const owner = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1").get();
+  if (target.id === owner?.id) return res.status(403).json({ message: 'The main owner cannot be removed' });
+  if (target.role === 'admin' && req.user.id !== owner?.id) return res.status(403).json({ message: 'Only the main owner can remove another administrator' });
+  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  return res.json({ message: 'User removed' });
 });
 
 authRouter.get('/admin/invitations', authenticate, requireAdmin, (req, res) => {
