@@ -15,6 +15,7 @@ export default function AdminUsers() {
   const [invitations, setInvitations] = useState([]);
   const [form, setForm] = useState({ email: '', role: 'user' });
   const [message, setMessage] = useState('');
+  const [createdInviteLink, setCreatedInviteLink] = useState('');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -30,13 +31,20 @@ export default function AdminUsers() {
     event.preventDefault();
     setError('');
     setMessage('');
+    setCreatedInviteLink('');
     try {
       const data = await api('/auth/admin/invitations', { method: 'POST', body: JSON.stringify(form) });
       const link = inviteLink(data.invitation.token);
       setInvitations((current) => [data.invitation, ...current]);
       setForm({ email: '', role: 'user' });
-      setMessage(`Invitation created. Share this link securely: ${link}`);
+      setCreatedInviteLink(link);
+      setMessage('Invitation created. Share this link securely with the invited email address.');
     } catch (inviteError) { setError(inviteError.message); }
+  }
+
+  async function copyInviteLink() {
+    await navigator.clipboard.writeText(createdInviteLink);
+    setMessage('Invitation link copied. Share it securely with the invited user.');
   }
 
   async function changeRole(id, role) {
@@ -62,7 +70,7 @@ export default function AdminUsers() {
       <h2 className="page-title">Team access</h2>
       <p className="mt-2 text-slate-600 dark:text-slate-300">Invite team members and assign their role. Only administrators can change access.</p>
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {message && <p className="mt-4 break-all rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
+      {message && <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800"><p>{message}</p>{createdInviteLink && <div className="mt-3 flex flex-wrap items-center gap-3"><a className="font-semibold text-blue-700 underline" href={createdInviteLink} target="_blank" rel="noreferrer">Open invitation link</a><button className="btn-secondary px-3 py-1 text-sm" type="button" onClick={copyInviteLink}>Copy link</button></div>}</div>}
       <form className="card mt-6 grid gap-4 md:grid-cols-[1fr_180px_auto]" onSubmit={createInvitation}>
         <input className="input" type="email" placeholder="colleague@example.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
         <select className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
