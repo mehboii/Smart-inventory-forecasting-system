@@ -302,6 +302,11 @@ async function handleAuth(request, env, db, path) {
   const user = await authenticate(request, env);
   const currentUser = assertDb(await db.from('users').select('*').eq('id', user.id).maybeSingle());
   if (!currentUser) return json({ message: 'User not found' }, { status: 404 });
+  if (request.method === 'GET' && path === '/auth/team') {
+    const members = assertDb(await db.from('users').select('id,name,role,created_at').order('created_at'));
+    const owner = assertDb(await db.from('users').select('id,name,email,created_at').eq('role', 'admin').order('created_at').limit(1).maybeSingle());
+    return json({ owner: owner || null, memberCount: members.length, members });
+  }
   if (path.startsWith('/auth/admin/') && currentUser.role !== 'admin') return json({ message: 'Admin role required' }, { status: 403 });
   if (request.method === 'GET' && path === '/auth/admin/users') {
     return json({ users: assertDb(await db.from('users').select('id,name,email,role,created_at').order('created_at')) });

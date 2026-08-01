@@ -50,6 +50,12 @@ authRouter.post('/register', async (req, res) => {
   }
 });
 
+authRouter.get('/team', authenticate, (_req, res) => {
+  const members = db.prepare('SELECT id, name, role FROM users ORDER BY created_at').all();
+  const owner = db.prepare("SELECT id, name, email FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1").get();
+  return res.json({ owner: owner || null, memberCount: members.length, members });
+});
+
 authRouter.get('/admin/users', authenticate, requireAdmin, (req, res) => {
   const users = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY created_at').all();
   return res.json({ users });
