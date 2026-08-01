@@ -2,10 +2,8 @@
 
 ## Login
 
-Use the seeded demo account or register a new account.
-
-- Demo email: `demo@inventory.edu`
-- Demo password: `password123`
+Register an account to begin. The application displays only the products and
+sales entered by the signed-in user.
 
 ## Dashboard
 

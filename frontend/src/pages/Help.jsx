@@ -1,6 +1,6 @@
 export default function Help() {
   const steps = [
-    ['1. Login or register', 'Use the demo account or create a new account. The app stores your session with JWT authentication.'],
+    ['1. Login or register', 'Create an account and sign in. The app stores your session with JWT authentication and shows only your database records.'],
     ['2. Add products', 'Open Inventory and enter the product name, SKU, category, current stock, reorder point, unit cost, and lead time.'],
     ['3. Add sales history', 'Open Forecasting, choose a product, then add manual rows or paste CSV rows using date,quantity_sold format.'],
     ['4. Generate a forecast', 'Choose Simple Moving Average for an easy average-based forecast or Exponential Smoothing to emphasize recent demand.'],

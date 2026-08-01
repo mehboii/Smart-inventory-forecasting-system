@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { navigate } from '../App.jsx';
 import { api } from '../api/client.js';
-import { subscribeToInventoryUpdates } from '../api/live.js';
 import { formatInr } from '../utils/currency.js';
 
 const metricLabels = [
@@ -90,9 +89,11 @@ export default function Dashboard() {
       const snapshot = await api(`/dashboard?refresh=${Date.now()}`);
       setDashboard(snapshot);
       setLastUpdated(new Date(snapshot.updatedAt));
+      setLiveConnected(true);
       setSyncError('');
     } catch (error) {
       setLastUpdated(null);
+      setLiveConnected(false);
       setSyncError(error.message || 'Dashboard data is unavailable.');
     }
   }, []);
@@ -102,11 +103,6 @@ export default function Dashboard() {
     const interval = window.setInterval(loadDashboard, 2000);
     return () => window.clearInterval(interval);
   }, [loadDashboard]);
-
-  useEffect(() => subscribeToInventoryUpdates({
-    onUpdate: loadDashboard,
-    onStatusChange: setLiveConnected
-  }), [loadDashboard]);
 
   const metrics = dashboard?.metrics;
   const products = dashboard?.products || [];
