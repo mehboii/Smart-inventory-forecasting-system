@@ -78,16 +78,29 @@ function CategoryMix({ categories, totalProducts }) {
   );
 }
 
+function TeamOverview({ team }) {
+  if (!team) return null;
+  return (
+    <section className="card mt-6">
+      <div className="panel-heading"><div><p className="eyebrow">Team workspace</p><h3>Members and roles</h3></div><span className="risk-badge">{team.memberCount} member{team.memberCount === 1 ? '' : 's'}</span></div>
+      <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Main owner: <strong>{team.owner?.name || 'Not assigned'}</strong>{team.owner?.email ? ` (${team.owner.email})` : ''}</p>
+      <div className="mt-4 flex flex-wrap gap-2">{team.members.map((member) => <span key={member.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">{member.name} <strong className="ml-1 capitalize">{member.role}</strong></span>)}</div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [team, setTeam] = useState(null);
   const [syncError, setSyncError] = useState('');
 
   const loadDashboard = useCallback(async () => {
     try {
       const snapshot = await api(`/dashboard?refresh=${Date.now()}`);
       setDashboard(snapshot);
+      api('/auth/team').then((teamData) => setTeam(teamData)).catch(() => null);
       setLastUpdated(new Date(snapshot.updatedAt));
       setLiveConnected(true);
       setSyncError('');
@@ -144,6 +157,8 @@ export default function Dashboard() {
         </section>
         <CategoryMix categories={categoryMix} totalProducts={metrics?.totalProducts ?? 0} />
       </div>
+
+      <TeamOverview team={team} />
 
       <section className="card details-panel">
         <div className="panel-heading"><div><p className="eyebrow">Operational feed</p><h3>Inventory Details</h3></div><button className="panel-action" onClick={() => navigate('/inventory')}>View all</button></div>
