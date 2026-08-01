@@ -6,7 +6,7 @@ This system helps a small business manage inventory, record sales, predict futur
 
 ## Technology Used.
 
-| Layer | Technology | Purpose |.
+| Layer | Technology | Purpose |
 | --- | --- | --- |
 | Frontend | React, Vite, Tailwind CSS | User interface and browser-side interactions |
 | Charts | Recharts and custom SVG/CSS charts | Forecast and dashboard visualizations |
