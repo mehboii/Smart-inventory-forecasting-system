@@ -1,3 +1,5 @@
+import { argon2id, argon2Verify } from 'hash-wasm';
+
 const PREFIX = '/Smartinventoryforecastingsystem';
 
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
@@ -14,10 +16,16 @@ function token() {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function passwordHash(password) {
+async function legacyPasswordHash(password) {
   const bytes = new TextEncoder().encode(String(password));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function passwordHash(password) {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  return argon2id({ password, salt, parallelism: 1, iterations: 2, memorySize: 19456, hashLength: 32, outputType: 'encoded' });
 }
 
 function publicUser(user) {
@@ -57,7 +65,7 @@ async function api(request, env, path) {
   const method = request.method;
   const body = method === 'GET' || method === 'DELETE' ? {} : await request.json().catch(() => ({}));
   if (path === '/health') return json({ status: 'ok' });
-  if (path === '/auth/login' && method === 'POST') { const user = await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(String(body.email || '').toLowerCase()).first(); if (!user || user.password_hash !== await passwordHash(body.password)) return fail('Invalid email or password', 401); const value = token(); await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').bind(value, user.id, new Date(Date.now() + 604800000).toISOString()).run(); return json({ token: value, user: publicUser(user) }); }
+  if (path === '/auth/login' && method === 'POST') { const user = await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(String(body.email || '').toLowerCase()).first(); const valid = user && (user.password_hash.startsWith('$argon2id$') ? await argon2Verify({ password: body.password, hash: user.password_hash }) : user.password_hash === await legacyPasswordHash(body.password)); if (!valid) return fail('Invalid email or password', 401); if (!user.password_hash.startsWith('$argon2id$')) { user.password_hash = await passwordHash(body.password); await env.DB.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(user.password_hash, user.id).run(); } const value = token(); await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').bind(value, user.id, new Date(Date.now() + 604800000).toISOString()).run(); return json({ token: value, user: publicUser(user) }); }
   if (path === '/auth/register' && method === 'POST') {
     if (!body.name || !body.email || String(body.password || '').length < 6) return fail('Name, email, and a 6-character password are required');
     const email = String(body.email).trim().toLowerCase();

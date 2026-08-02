@@ -7,7 +7,7 @@ A full-stack university project for small-business inventory tracking and explai
 - Frontend: React, Vite, Tailwind CSS, Recharts
 - Backend: Node.js, Express
 - Database: local SQLite through `better-sqlite3`
-- Auth: JWT plus bcrypt password hashing
+- Auth: JWT plus Argon2id password hashing (existing bcrypt hashes upgrade on successful login)
 - Forecasting: Simple Moving Average and Exponential Smoothing
 
 ## Project Structure

@@ -1,5 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import { argon2id, argon2Verify } from 'hash-wasm';
 import { db } from '../db/database.js';
 import { authenticate, createToken } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -7,6 +8,16 @@ import crypto from 'crypto';
 import { requireFields } from '../utils/validators.js';
 
 export const authRouter = express.Router();
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  return argon2id({ password, salt, parallelism: 1, iterations: 2, memorySize: 19456, hashLength: 32, outputType: 'encoded' });
+}
+
+async function verifyPassword(password, hash) {
+  if (hash.startsWith('$argon2id$')) return argon2Verify({ password, hash });
+  return bcrypt.compare(password, hash);
+}
 
 function publicUser(user) {
   return {
@@ -24,7 +35,6 @@ authRouter.post('/register', async (req, res) => {
   if (String(req.body.password).length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
 
   const email = req.body.email.trim().toLowerCase();
-  const passwordHash = await bcrypt.hash(req.body.password, 10);
   try {
     const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").get().count;
     let role = 'user';
@@ -36,6 +46,7 @@ authRouter.post('/register', async (req, res) => {
       role = invitation.role;
       req.invitationId = invitation.id;
     }
+    const passwordHash = await hashPassword(req.body.password);
     const result = db
       .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
       .run(req.body.name.trim(), email, passwordHash, role);
@@ -114,8 +125,13 @@ authRouter.post('/login', async (req, res) => {
   if (error) return res.status(400).json({ message: error });
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(req.body.email.trim().toLowerCase());
-  if (!user || !(await bcrypt.compare(req.body.password, user.password_hash))) {
+  if (!user || !(await verifyPassword(req.body.password, user.password_hash))) {
     return res.status(401).json({ message: 'Invalid email or password' });
+  }
+
+  if (!user.password_hash.startsWith('$argon2id$')) {
+    user.password_hash = await hashPassword(req.body.password);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(user.password_hash, user.id);
   }
 
   const token = createToken(user);
