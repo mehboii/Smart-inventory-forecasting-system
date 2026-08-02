@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { argon2id, argon2Verify } from 'hash-wasm';
 import { createClient } from '@supabase/supabase-js';
 
 const APP_PREFIX = '/Smartinventoryforecastingsystem';
@@ -129,6 +130,17 @@ function randomToken() {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password) {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  return argon2id({ password, salt, parallelism: 1, iterations: 2, memorySize: 19456, hashLength: 32, outputType: 'encoded' });
+}
+
+async function verifyPassword(password, hash) {
+  if (hash.startsWith('$argon2id$')) return argon2Verify({ password, hash });
+  return bcrypt.compare(password, hash);
 }
 
 function validRole(role) {
@@ -273,7 +285,7 @@ async function handleAuth(request, env, db, path) {
       if (!invitation) return json({ message: 'An active invitation is required. Ask an administrator to invite you.' }, { status: 403 });
       role = invitation.role;
     }
-    const password_hash = await bcrypt.hash(body.password, 10);
+    const password_hash = await hashPassword(body.password);
     const result = await db.from('users').insert({
       name: body.name.trim(),
       email,
@@ -290,7 +302,11 @@ async function handleAuth(request, env, db, path) {
     const error = requireFields(body, ['email', 'password']);
     if (error) return json({ message: error }, { status: 400 });
     const user = assertDb(await db.from('users').select('*').eq('email', body.email.trim().toLowerCase()).maybeSingle());
-    if (!user || !(await bcrypt.compare(body.password, user.password_hash))) return json({ message: 'Invalid email or password' }, { status: 401 });
+    if (!user || !(await verifyPassword(body.password, user.password_hash))) return json({ message: 'Invalid email or password' }, { status: 401 });
+    if (!user.password_hash.startsWith('$argon2id$')) {
+      user.password_hash = await hashPassword(body.password);
+      assertDb(await db.from('users').update({ password_hash: user.password_hash }).eq('id', user.id));
+    }
     const token = await createToken(user, env);
     return json({ token, user: publicUser(user) }, { headers: { 'Set-Cookie': `token=${token}; HttpOnly; SameSite=Lax; Secure; Path=${APP_PREFIX}; Max-Age=${TOKEN_TTL_SECONDS}` } });
   }
