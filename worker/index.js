@@ -340,7 +340,8 @@ async function handleAuth(request, env, db, path) {
     const owner = assertDb(await db.from('users').select('id').eq('role', 'admin').order('created_at').limit(1).maybeSingle());
     if (String(target.id) === String(owner?.id)) return json({ message: 'The main owner role cannot be changed' }, { status: 403 });
     if (target.role === 'admin' && role !== 'admin') {
-      const admins = assertDb(await db.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin'));
+      const admins = await db.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin');
+      assertDb(admins);
       if (admins.count === 1) return json({ message: 'At least one administrator must remain' }, { status: 400 });
     }
     const updated = assertDb(await db.from('users').update({ role }).eq('id', target.id).select().single());
