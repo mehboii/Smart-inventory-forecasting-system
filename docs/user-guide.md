@@ -1,4 +1,4 @@
-# Smart Inventory Forecasting System User Guide
+# Smart Inventory Forecasting System User Guide.
 
 ## Login
 
