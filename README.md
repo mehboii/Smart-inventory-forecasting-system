@@ -10,7 +10,7 @@ A full-stack university project for small-business inventory tracking and explai
 - Auth: JWT plus Argon2id password hashing (existing bcrypt hashes upgrade on successful login)
 - Forecasting: Simple Moving Average and Exponential Smoothing
 
-## Project Structure.
+## Project Structure
 
 ```text
 backend/   Express API, SQLite schema, auth, inventory, sales, forecasts, reports
