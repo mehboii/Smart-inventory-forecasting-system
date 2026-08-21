@@ -2,7 +2,7 @@
 
 A full-stack university project for small-business inventory tracking and explainable demand forecasting.
 
-## Tech Stack
+## Tech Stack.
 
 - Frontend: React, Vite, Tailwind CSS, Recharts
 - Backend: Node.js, Express
