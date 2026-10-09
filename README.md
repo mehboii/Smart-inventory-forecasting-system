@@ -92,6 +92,48 @@ The first value is the sale date in `YYYY-MM-DD` format. The second value is qua
 
 ## API Overview
 
+For login in Postman, select **POST**, set `Content-Type: application/json`,
+and send a raw JSON body containing `email` and `password`.
+
+- Local URL: `http://localhost:4000/api/auth/login`
+- Deployed URL: `https://n11xcollective.me/Smartinventoryforecastingsystem/api/auth/login`
+
+```json
+{ "email": "your-email@example.com", "password": "your-password" }
+```
+
+A `404` usually means the URL or method does not match the route. A `401`
+means the credentials were rejected. For a `500`, check the backend terminal
+or Cloudflare Worker logs for the underlying exception. The deployed Worker
+requires `SUPABASE_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) and access to the
+application's `users` table; local Express uses SQLite instead.
+
+### Cloudflare login and page troubleshooting
+
+Set `SUPABASE_URL` to the current project's API URL and `SUPABASE_KEY` to
+that same project's API key in the Worker's secrets. There is no default
+database URL. Worker logs showing `error code: 1016` indicate an upstream
+DNS failure: verify that the Supabase project still exists and its URL
+resolves before changing authentication code. The Worker returns `503`
+when the database is unconfigured or unreachable.
+
+Build and deploy from the repository root:
+
+```powershell
+npm.cmd run build:cloudflare
+npx.cmd wrangler login
+npx.cmd wrangler secret put SUPABASE_URL
+npx.cmd wrangler secret put SUPABASE_KEY
+npx.cmd wrangler deploy
+```
+
+Enter secret values at the prompts. The frontend build supports Windows
+and includes a favicon under `/Smartinventoryforecastingsystem/`. The
+Worker serves `index.html` at the application base URL and for HTML
+navigation requests, including direct visits to the login page.
+
+Run Worker regression checks with `node --test worker/index.test.mjs`.
+
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`

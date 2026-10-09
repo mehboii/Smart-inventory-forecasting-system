@@ -9,9 +9,11 @@ let cachedDb;
 let cachedDbKey;
 
 function getDb(env) {
-  const url = env.SUPABASE_URL || 'https://lmchqykidfdyanndexjp.supabase.co';
+  const url = env.SUPABASE_URL;
   const key = env.SUPABASE_KEY || env.SUPABASE_PUBLISHABLE_KEY;
-  if (!key) throw new Error('SUPABASE_KEY is required.');
+  if (!url || !key) {
+    throw Object.assign(new Error('Database connection is not configured. Contact your administrator.'), { status: 503, code: 'DATABASE_NOT_CONFIGURED' });
+  }
   const cacheKey = `${url}:${key}`;
   if (!cachedDb || cachedDbKey !== cacheKey) {
     cachedDb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -24,6 +26,10 @@ function assertDb(result, message = 'Database request failed') {
   if (result.error) {
     const error = new Error(result.error.message || message);
     error.code = result.error.code;
+    if (/error code: 1016|fetch failed|failed to fetch|ENOTFOUND|EAI_AGAIN/i.test(error.message)) {
+      error.status = 503;
+      error.publicMessage = 'Database service is unavailable. Contact your administrator.';
+    }
     throw error;
   }
   return result.data;
@@ -608,7 +614,12 @@ async function handleApi(request, env, path) {
 async function serveAsset(request, env) {
   const url = new URL(request.url);
   const appPath = url.pathname.slice(APP_PREFIX.length);
-  const isNavigation = request.headers.get('Sec-Fetch-Mode') === 'navigate';
+  const isNavigation = request.headers.get('Sec-Fetch-Mode') === 'navigate'
+    || request.headers.get('Accept')?.includes('text/html');
+  if ((request.method === 'GET' || request.method === 'HEAD') && appPath === '/') {
+    url.pathname = `${APP_PREFIX}/index.html`;
+    return env.ASSETS.fetch(new Request(url, request));
+  }
   if (isNavigation && appPath && !appPath.includes('.')) {
     url.pathname = `${APP_PREFIX}/index.html`;
     return env.ASSETS.fetch(new Request(url, request));
@@ -628,14 +639,14 @@ export default {
         url.pathname = `${APP_PREFIX}/`;
         return Response.redirect(url, 308);
       }
-      if (url.pathname.startsWith(`${APP_PREFIX}/api`)) {
+      if (url.pathname === `${APP_PREFIX}/api` || url.pathname.startsWith(`${APP_PREFIX}/api/`)) {
         const apiPath = url.pathname.slice(`${APP_PREFIX}/api`.length) || '/';
-        return handleApi(request, env, apiPath);
+        return await handleApi(request, env, apiPath);
       }
-      return serveAsset(request, env);
+      return await serveAsset(request, env);
     } catch (error) {
-      console.error(error);
-      return json({ message: error.status ? error.message : 'Unexpected server error' }, { status: error.status || 500 });
+      console.error(JSON.stringify({ message: error.message, code: error.code, path: new URL(request.url).pathname }));
+      return json({ message: error.publicMessage || (error.status ? error.message : 'Unexpected server error') }, { status: error.status || 500 });
     }
   }
 };
