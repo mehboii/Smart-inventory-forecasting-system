@@ -7,7 +7,7 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
-    "build:cloudflare": "VITE_BASE_PATH=/Smartinventoryforecastingsystem npm run build --prefix frontend",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "seed": "npm run seed --prefix backend"
   },
